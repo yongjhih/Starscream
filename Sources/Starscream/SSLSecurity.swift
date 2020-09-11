@@ -168,8 +168,22 @@ open class SSLSecurity : SSLTrustValidator {
                 collect.append(SecCertificateCreateWithData(nil,cert as CFData)!)
             }
             SecTrustSetAnchorCertificates(trust,collect as NSArray)
-            var result: SecTrustResultType = .unspecified
-            SecTrustEvaluate(trust,&result)
+            var result: SecTrustResultType = .recoverableTrustFailure
+            
+            if #available(iOS 13.0, *) {
+                let serverCert = SecTrustGetCertificateAtIndex(trust, 0)
+                
+                if let cert = serverCert {
+                    var commonName: CFString?
+                    SecCertificateCopyCommonName(cert, &commonName)
+                    
+                    if let name = commonName as String? {
+                        result = domain == name ? .proceed : .recoverableTrustFailure
+                    }
+                }
+            } else {
+                SecTrustEvaluate(trust, &result)
+            }
             if result == .unspecified || result == .proceed {
                 if !validateEntireChain {
                     return true
